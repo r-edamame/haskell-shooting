@@ -35,6 +35,14 @@ data Object =
          , speed :: Vec.Vector2D
          , shotTimer :: Int
   } |
+  Boss1 { tag :: ObjectTag
+        , position :: Position2D
+        , size :: Size2D
+        , color :: ColorF
+        , life :: Int
+        , timer :: Int
+        , speed :: Vec.Vector2D
+  } |
   -- Enemyを出現させるためのオブジェクト
   EnemyServer { tag :: ObjectTag
               , timer :: Int
@@ -80,7 +88,7 @@ update inputs game pl@(Player {}) = player' ++ bul
     (bul,timer') = if (shotTimer pl<=0) then
                      if isPressed key_shot inputs then
                        -- 弾が発射可能(タイマーが0 & キーが押されている)なとき弾を生成する
-                       (take 4 (map (\r->Bullet1 PBulletTag (position pl) (10,10) (GL.Color3 0 1 0) (r*6-3,(abs (r-0.5))*5-8)) (randomVal game)),2)
+                       (take 2 (map (\r->Bullet1 PBulletTag (position pl) (10,10) (GL.Color3 0 1 0) (r*6-3,(abs (r-0.5))*5-8)) (randomVal game)),2)
                      else
                        ([],0)
                    else
@@ -109,17 +117,46 @@ update _ game ene@(Enemy1 {}) = enemy' ++ bul
                [ene {position=pos', life=life', shotTimer=timer'}]
     timer' = let t = shotTimer ene in if t>=0 then t-1 else t
     bul    = if shotTimer ene == 0 then
-               map (Bullet1 EBulletTag (position ene) (10,10) (GL.Color3 0 1 1)) [(x,y)|x<-[5,-5],y<-[5,-5]]
+               map (Bullet1 EBulletTag (position ene) (10,10) (GL.Color3 0 1 1)) [(x,y)|x<-[4,-4],y<-[4,-4],x/=0||y/=0]
              else
                []
 
 -- EnemyServer
-update inputs game ser@(EnemyServer {}) = ser{timer=timer'} : enemy
+update inputs game ser@(EnemyServer {}) = self ++ enemy
   where
+    timer' = timer ser + 1
+    self = if timer' >= 2000 then [] else [ser{timer=timer'}]
+    rnd = head $ randomVal game
     sx = Vec.getx . stageSize $ game
-    (enemy,timer') =  if timer ser <= 0 then
-                          ([Enemy1 EnemyTag (sx*head (randomVal game), 0) (20,20) (GL.Color3 0 0 1) 4 (0,3) 50], 10)
-                      else ([], timer ser -1)
+    enemy = if timer' <= 1800 && timer' `mod` 30 == 0 then
+              -- タイマが1800以下のとき一定のタイミングで通常敵を出す
+              [Enemy1 EnemyTag (sx*rnd, 0) (20,20) (GL.Color3 0 0 1) 4 (0,3) (truncate (rnd*60+40))]
+            else if timer' == 2000 then
+              -- タイマが2000のときボスを出現させる
+              [Boss1 EnemyTag (200,50) (40,40) (GL.Color3 0 0 0) 1000 100 (0,0)]
+            else
+              []
+  
+
+-- Boss
+update inputs game boss@(Boss1 {}) = boss' ++ bul
+  where
+    timer' = if timer boss > 0 then 
+               timer boss - 1 
+             else 
+               0
+    (r1:r2:r3:_) = randomVal game
+    dir = Vec.unit (r1 - 0.5, r2)
+    pos' = position boss `Vec.add` speed boss
+    bul = if timer' <= 0 then
+            [Bullet1 EBulletTag (position boss) (5,5) (GL.Color3 (r1/2) (r2/2) (r3/2)) (dir `Vec.scale` (r3*3+1))]
+          else
+            []
+    life' = life boss - length [o|o<-objects game, tag o == PBulletTag, isCollided boss o]
+    boss' = if life'>0 then
+              [boss {timer=timer', life=life', position=pos'}]
+            else
+              []
 
 -- オブジェクトの描画
 render :: Object -> IO ()
@@ -130,7 +167,8 @@ render o = drawQuad (color o) (position o) (size o)
 data Shooting = Shooting {
   objects :: [Object],
   stageSize :: Size2D,
-  randomVal :: [GL.GLfloat]
+  randomVal :: [GL.GLfloat],
+  isGameOver :: Bool
 }
 
 -- ShootingをGame型クラスのインスタンスに設定する
@@ -144,4 +182,6 @@ instance Game Shooting where
 newgame :: IO (IORef Shooting)
 newgame = do
   gen <- newStdGen
-  newIORef $ Shooting [Player PlayerTag (200,200) (20,20) (GL.Color3 1 0 0) 10 100, EnemyServer ServerTag (100)] (400,400) (randoms gen)
+  let objs = [ Player PlayerTag (200,200) (5,5) (GL.Color3 1 0 0) 20 100
+             , EnemyServer ServerTag 0]
+  newIORef $ Shooting objs (400,400) (randoms gen) False

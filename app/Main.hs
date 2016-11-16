@@ -22,7 +22,7 @@ main = do
   GL.blend $= GL.Enabled
   GL.blendFunc $= (GL.SrcAlpha, GL.OneMinusSrcAlpha)
   GL.lineWidth $= 1.5
-  GL.clearColor $= GL.Color4 0 0 0 0
+  GL.clearColor $= GL.Color4 1 1 1 0
 
   GLFW.windowSizeCallback $= \size@(GL.Size w h) -> do
     GL.viewport $= (GL.Position 0 0, size)

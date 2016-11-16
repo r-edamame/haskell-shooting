@@ -9,4 +9,3 @@ class Game g where
   renderGame :: g -> IO ()
   -- ゲームはキー入力により更新可能
   updateGame :: KeyInputs -> g -> g
-
