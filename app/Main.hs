@@ -13,6 +13,7 @@ import Control.Monad (when,unless)
 
 
 main = do
+  -- GLFW初期化処理
   GLFW.initialize
   GLFW.openWindow (GL.Size 400 400) [GLFW.DisplayAlphaBits 8] GLFW.Window
   GLFW.windowTitle $= "GLFW Demo"
@@ -30,10 +31,13 @@ main = do
     GL.loadIdentity
     GL.ortho2D 0 (realToFrac w) (realToFrac h) 0
 
+  -- 新しいゲームを生成
   game <- newgame
 
+  -- 実際のゲーム実行
   mainloop game
   
+  -- プログラム終了処理
   GLFW.closeWindow
   GLFW.terminate
 
@@ -46,6 +50,8 @@ main = do
            , key_esc
            , key_restart
            ]
+
+    -- ゲームループ
     mainloop game = do
       -- キー入力の状態を取得
       keyInputs <- zip keys <$> mapM GLFW.getKey keys
